@@ -18,6 +18,10 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Cloned branch directories
+backend/
+frontend/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
