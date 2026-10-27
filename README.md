@@ -1,65 +1,77 @@
-# blfa-demo
+# BLFA Demo - Frontend
 
-A headless WordPress backend exposing GraphQL paired with a Next.js frontend.
+Next.js App Router frontend for the headless WordPress backend, styled with minimal vanilla CSS and fetching data via WPGraphQL.
 
-## Repository Layout & Branches
+## Architecture
 
-This repository uses separate long-lived branches for the backend and frontend services:
-- `backend`: Headless WordPress (Docker Compose, Nginx, MySQL, WP-CLI, WPGraphQL) and backend CI.
-- `frontend`: Next.js App Router, TypeScript, vanilla CSS, and frontend CI.
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Vanilla CSS (single global stylesheet, system fonts, zero UI frameworks or animations)
+- **Data Fetching**: Plain `fetch` querying WPGraphQL with 60-second revalidation (`revalidate: 60`)
+- **HTML Sanitization**: WordPress post HTML is rendered safely using `sanitize-html`
+- **Output**: Next.js `standalone` mode for containerization
 
-Git worktrees are used to check out both branches simultaneously into separate directories:
+## Endpoints & URLs
 
-```text
-├── blfa-demo/            # Root repository (main branch, initial commit)
-├── blfa-demo-backend/    # Worktree checked out on branch `backend`
-└── blfa-demo-frontend/   # Worktree checked out on branch `frontend`
-```
+| Endpoint | URL | Description |
+| :--- | :--- | :--- |
+| **Home Page** | [http://localhost:3000](http://localhost:3000) | Lists latest published WordPress posts |
+| **Post Detail** | `http://localhost:3000/posts/[slug]` | Individual post page |
+| **Health Check** | [http://localhost:3000/api/health](http://localhost:3000/api/health) | Returns JSON `{"status":"ok"}` |
 
-### Git Worktree Setup Commands
+## Environment Variables
 
-To set up the worktrees from scratch:
+Configured in `.env.local` (local host development) or `.env` / compose (Docker):
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_WORDPRESS_API_URL` | `http://localhost:9000/graphql` | Browser-facing GraphQL URL, baked into client builds |
+| `WORDPRESS_INTERNAL_API_URL` | `http://nginx/graphql` | Internal Docker GraphQL URL used by server-side fetch |
+| `PORT` | `3000` | Application HTTP port |
+
+## Running Locally on Host
+
+Make sure the backend is running at `http://localhost:9000` before starting:
 
 ```bash
-# Clone the repository
-git clone <repo-url> blfa-demo
-cd blfa-demo
+# 1. Install dependencies
+npm ci
 
-# Create worktree for backend branch
-git worktree add ../blfa-demo-backend backend
+# 2. Configure local environment
+cp .env.example .env.local
 
-# Create worktree for frontend branch
-git worktree add ../blfa-demo-frontend frontend
+# Note: On host, set WORDPRESS_INTERNAL_API_URL to http://localhost:9000/graphql in .env.local
+
+# 3. Start development server
+npm run dev
 ```
 
-To list existing worktrees:
+Visit [http://localhost:3000](http://localhost:3000).
+
+## Running in Docker
+
+Ensure the backend services are running and the `blfa-network` network exists (started from the backend worktree):
+
 ```bash
-git worktree list
+# Build and start container in background
+docker compose up --build -d
+
+# View status and health
+docker compose ps
+
+# Follow logs
+docker compose logs -f frontend
+
+# Stop container
+docker compose down
 ```
 
-To remove a worktree when no longer needed:
+## Linting and Building
+
 ```bash
-git worktree remove ../blfa-demo-backend
-git worktree remove ../blfa-demo-frontend
+# Run ESLint
+npm run lint
+
+# Create production build
+npm run build
 ```
-
-## Quick Start Overview
-
-### 1. Backend
-- Navigate to `blfa-demo-backend/`
-- Run setup script: `./scripts/setup-backend.sh` (or `.\scripts\setup-backend.ps1` on Windows)
-- WordPress Admin: http://localhost:9000/wp-admin
-- GraphQL Endpoint: http://localhost:9000/graphql
-- Healthcheck: http://localhost:9000/healthz
-
-### 2. Frontend
-- Navigate to `blfa-demo-frontend/`
-- Run via Docker: `docker compose up --build -d`
-- Or run locally:
-  ```bash
-  npm ci
-  cp .env.example .env.local
-  npm run dev
-  ```
-- Frontend Web App: http://localhost:3000
-- Healthcheck: http://localhost:3000/api/health
