@@ -17,6 +17,8 @@ set -a
 set +a
 
 # 2. Start containers with docker compose
+echo "Ensuring src/wordpress directory exists..."
+mkdir -p src/wordpress
 echo "Starting Docker Compose services..."
 docker compose up -d
 
@@ -38,10 +40,10 @@ while true; do
   fi
 done
 
-# Wait for WordPress files to initialize in volume
-echo "Waiting for WordPress files to initialize..."
+# Wait for WordPress files and wp-config.php to initialize
+echo "Waiting for WordPress files and wp-config.php to initialize..."
 wp_timeout=60
-while ! docker compose run --rm wp-cli wp core version >/dev/null 2>&1; do
+while [ ! -f src/wordpress/wp-config.php ]; do
   sleep 2
   wp_timeout=$((wp_timeout - 2))
   if [ $wp_timeout -le 0 ]; then

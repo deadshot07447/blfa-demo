@@ -3,6 +3,10 @@
 .env.local
 .env.*.local
 
+# WordPress core bind mount files (keep folder, ignore downloaded runtime files)
+src/wordpress/*
+!src/wordpress/.gitkeep
+
 # OS and temporary files
 .DS_Store
 Thumbs.db

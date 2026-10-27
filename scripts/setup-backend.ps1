@@ -19,6 +19,8 @@ Get-Content .env | ForEach-Object {
 }
 
 # 2. Start containers with docker compose
+Write-Host "Ensuring src/wordpress directory exists..."
+New-Item -ItemType Directory -Force -Path "src/wordpress" | Out-Null
 Write-Host "Starting Docker Compose services..."
 docker compose up -d
 
@@ -43,12 +45,11 @@ if (-not $healthy) {
     exit 1
 }
 
-# Wait for WordPress files to initialize in volume
-Write-Host "Waiting for WordPress files to initialize..."
+# Wait for WordPress files and wp-config.php to initialize
+Write-Host "Waiting for WordPress files and wp-config.php to initialize..."
 $wpInitTimeout = 60
 while ($wpInitTimeout -gt 0) {
-    docker compose run --rm wp-cli wp core version 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
+    if (Test-Path "src/wordpress/wp-config.php") {
         break
     }
     Start-Sleep -Seconds 2
