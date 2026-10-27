@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getPostBySlug } from '@/lib/api';
 import { cleanHtml } from '@/lib/sanitize';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 interface PostPageProps {
   params: {
