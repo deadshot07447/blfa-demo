@@ -14,7 +14,7 @@ services:
       NEXT_PUBLIC_WORDPRESS_API_URL: ${NEXT_PUBLIC_WORDPRESS_API_URL:-http://localhost:9000/graphql}
       WORDPRESS_INTERNAL_API_URL: ${WORDPRESS_INTERNAL_API_URL:-http://nginx/graphql}
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5
