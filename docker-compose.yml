@@ -1,0 +1,83 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME:-blfa_db}
+      MYSQL_USER: ${WORDPRESS_DB_USER:-blfa_user}
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD:-CHANGE_ME_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${WORDPRESS_DB_ROOT_PASSWORD:-CHANGE_ME_ROOT_PASSWORD}
+    volumes:
+      - blfa_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+    networks:
+      - blfa-network
+
+  wordpress:
+    image: wordpress:php8.2-fpm-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-blfa_db}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-blfa_user}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-CHANGE_ME_DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-1}
+    volumes:
+      - blfa_wp_data:/var/www/html
+    networks:
+      - blfa-network
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${WORDPRESS_PORT:-9000}:80"
+    depends_on:
+      - wordpress
+    volumes:
+      - blfa_wp_data:/var/www/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - blfa-network
+
+  wp-cli:
+    image: wordpress:cli-php8.2
+    profiles:
+      - tools
+    user: "82:82"
+    depends_on:
+      db:
+        condition: service_healthy
+      wordpress:
+        condition: service_started
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-blfa_db}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-blfa_user}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-CHANGE_ME_DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-1}
+    volumes:
+      - blfa_wp_data:/var/www/html
+    networks:
+      - blfa-network
+
+volumes:
+  blfa_db_data:
+    name: blfa_db_data
+  blfa_wp_data:
+    name: blfa_wp_data
+
+networks:
+  blfa-network:
+    name: blfa-network
+    driver: bridge

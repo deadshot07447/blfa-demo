@@ -1,65 +1,103 @@
-# blfa-demo
+# BLFA Demo - Backend
 
-A headless WordPress backend exposing GraphQL paired with a Next.js frontend.
+Headless WordPress backend exposing a GraphQL API via WPGraphQL, served by Nginx and backed by MySQL.
 
-## Repository Layout & Branches
+## Architecture
 
-This repository uses separate long-lived branches for the backend and frontend services:
-- `backend`: Headless WordPress (Docker Compose, Nginx, MySQL, WP-CLI, WPGraphQL) and backend CI.
-- `frontend`: Next.js App Router, TypeScript, vanilla CSS, and frontend CI.
+This service uses official, unmodified upstream container images without custom Dockerfiles:
+- **Nginx (`nginx:1.27-alpine`)**: Public gateway on port `9000`. Serves static assets, routes `/healthz` directly, and forwards dynamic requests to WordPress via FastCGI.
+- **WordPress (`wordpress:php8.2-fpm-alpine`)**: Headless PHP-FPM application.
+- **MySQL (`mysql:8.0`)**: Relational database with automatic health check.
+- **WP-CLI (`wordpress:cli-php8.2`)**: CLI tool under the `tools` compose profile for automated initialization and seeding.
+- **Network (`blfa-network`)**: Bridge network named `blfa-network` to allow the frontend container to communicate internally.
 
-Git worktrees are used to check out both branches simultaneously into separate directories:
+## Endpoints
 
-```text
-├── blfa-demo/            # Root repository (main branch, initial commit)
-├── blfa-demo-backend/    # Worktree checked out on branch `backend`
-└── blfa-demo-frontend/   # Worktree checked out on branch `frontend`
-```
+When the stack is running:
+| Endpoint | URL | Description |
+| :--- | :--- | :--- |
+| **WordPress Admin** | [http://localhost:9000/wp-admin](http://localhost:9000/wp-admin) | WordPress administrative dashboard |
+| **GraphQL Endpoint** | [http://localhost:9000/graphql](http://localhost:9000/graphql) | WPGraphQL query endpoint |
+| **Health Check** | [http://localhost:9000/healthz](http://localhost:9000/healthz) | Plain text `ok` status (200) |
 
-### Git Worktree Setup Commands
+## Environment Variables
 
-To set up the worktrees from scratch:
+Configured in `.env` (copied from `.env.example`):
 
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `WORDPRESS_DB_NAME` | `blfa_db` | MySQL database name |
+| `WORDPRESS_DB_USER` | `blfa_user` | MySQL database user |
+| `WORDPRESS_DB_PASSWORD` | `CHANGE_ME_DB_PASSWORD` | MySQL user password |
+| `WORDPRESS_DB_ROOT_PASSWORD` | `CHANGE_ME_ROOT_PASSWORD` | MySQL root administrative password |
+| `WORDPRESS_TABLE_PREFIX` | `wp_` | Table prefix in MySQL database |
+| `WORDPRESS_DEBUG` | `1` | Enable/disable WordPress debug mode |
+| `WORDPRESS_PORT` | `9000` | Host port mapped to Nginx web server |
+| `WORDPRESS_TITLE` | `BLFA Demo WordPress` | Site title configured during core install |
+| `WORDPRESS_ADMIN_USER` | `admin` | WordPress admin username |
+| `WORDPRESS_ADMIN_PASSWORD` | `adminpassword` | WordPress admin password |
+| `WORDPRESS_ADMIN_EMAIL` | `admin@example.com` | WordPress admin email address |
+
+## Getting Started
+
+### 1. Automated Setup
+
+Run the setup script from the backend directory:
+
+**Linux / macOS:**
 ```bash
-# Clone the repository
-git clone <repo-url> blfa-demo
-cd blfa-demo
-
-# Create worktree for backend branch
-git worktree add ../blfa-demo-backend backend
-
-# Create worktree for frontend branch
-git worktree add ../blfa-demo-frontend frontend
+chmod +x ./scripts/setup-backend.sh
+./scripts/setup-backend.sh
 ```
 
-To list existing worktrees:
+**Windows (PowerShell):**
+```powershell
+.\scripts\setup-backend.ps1
+```
+
+The setup script performs the following steps idempotently:
+1. Copies `.env.example` to `.env` if `.env` does not already exist.
+2. Starts the backend services (`docker compose up -d`).
+3. Waits for the MySQL container to report healthy.
+4. Uses `wp-cli` to install WordPress core (if not already installed).
+5. Configures the permalink structure to `/%postname%/`.
+6. Installs and activates the `wp-graphql` plugin.
+7. Seeds 5 sample posts if no posts currently exist.
+
+### 2. Manual Run
+
+If you wish to manage containers manually:
 ```bash
-git worktree list
+# Start background services
+docker compose up -d
+
+# View status
+docker compose ps
 ```
 
-To remove a worktree when no longer needed:
+## Viewing Logs
+
+To stream logs from all services or a specific service:
 ```bash
-git worktree remove ../blfa-demo-backend
-git worktree remove ../blfa-demo-frontend
+# All containers
+docker compose logs -f
+
+# Specific containers
+docker compose logs -f nginx
+docker compose logs -f wordpress
+docker compose logs -f db
 ```
 
-## Quick Start Overview
+## Running WP-CLI Commands
 
-### 1. Backend
-- Navigate to `blfa-demo-backend/`
-- Run setup script: `./scripts/setup-backend.sh` (or `.\scripts\setup-backend.ps1` on Windows)
-- WordPress Admin: http://localhost:9000/wp-admin
-- GraphQL Endpoint: http://localhost:9000/graphql
-- Healthcheck: http://localhost:9000/healthz
+To run arbitrary WP-CLI commands against the running stack:
+```bash
+docker compose run --rm wp-cli post list
+```
 
-### 2. Frontend
-- Navigate to `blfa-demo-frontend/`
-- Run via Docker: `docker compose up --build -d`
-- Or run locally:
-  ```bash
-  npm ci
-  cp .env.example .env.local
-  npm run dev
-  ```
-- Frontend Web App: http://localhost:3000
-- Healthcheck: http://localhost:3000/api/health
+## Full Reset
+
+To stop all services and wipe all data volumes (database and uploads):
+```bash
+docker compose down -v
+```

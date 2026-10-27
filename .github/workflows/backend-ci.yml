@@ -1,0 +1,50 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - backend
+  pull_request:
+    branches:
+      - backend
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
+
+      - name: Test Nginx configuration
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.27-alpine nginx -t
+
+      - name: Bring the Docker Compose stack up
+        run: docker compose up -d
+
+      - name: Verify healthz endpoint
+        run: |
+          timeout=60
+          until curl -sSf http://localhost:9000/healthz | grep -q "ok"; do
+            echo "Waiting for http://localhost:9000/healthz to respond with ok..."
+            sleep 2
+            timeout=$((timeout - 2))
+            if [ $timeout -le 0 ]; then
+              echo "Timeout reached waiting for /healthz"
+              docker compose logs
+              exit 1
+            fi
+          done
+          echo "Health check succeeded: http://localhost:9000/healthz returned ok"
+
+      - name: Clean up Docker Compose stack
+        if: always()
+        run: docker compose down -v
